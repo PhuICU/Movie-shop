@@ -96,19 +96,6 @@ const movieController = {
       res.status(400).json({ message: error.message });
     }
   },
-
-  comments: async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { comments } = req.body;
-      const product = await Product.findById(id);
-      product.comments.push(comments);
-      await product.save();
-      res.json(product);
-    } catch (error) {
-      res.status(400).json({ message: error.message });
-    }
-  },
 };
 
 module.exports = movieController;

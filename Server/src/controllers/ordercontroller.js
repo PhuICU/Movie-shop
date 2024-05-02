@@ -1,68 +1,127 @@
 const Order = require("../models/order");
+const Product = require("../models/movie");
+const DetailPayment = require("../models/detailPayment");
+const DetailOrder = require("../models/detailOrder");
+const Cart = require("../models/cart");
+const User = require("../models/user");
+
+const cartdelete = require("../controllers/cartcontroller");
+
+const moment = require("moment");
 
 const orderController = {
   addOrder: async (req, res) => {
     try {
-      const { user_id, products, address, phone, totalPrice } = req.body;
-      const order = new Order({
-        user_id,
-        products,
+      const { address, phone, name, payment, user_id } = req.body;
+      const cart = await Cart.findOne({ user_id }).populate("products.product");
+      const user = await User.findById(user_id);
+      if (!cart) return res.status(400).json({ msg: "Cart is empty" });
+      if (!user) return res.status(400).json({ msg: "User not found" });
+      const newOrder = new Order({
         address,
         phone,
-        totalPrice,
+        name,
+        payment,
+        user_id,
+        total: cart.total,
       });
-      const createdOrder = await order.save();
-      res.status(201).json(createdOrder);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+      await newOrder.save();
+      cart.products.map(async (item) => {
+        const newDetailOrder = new DetailOrder({
+          order_id: newOrder._id,
+          product_id: item.product._id,
+          price: item.product.price,
+        });
+        await newDetailOrder.save();
+        await Product.findByIdAndUpdate(item.product._id, {
+          $inc: { sold: item.quantity },
+        });
+      });
+
+      res.json({ msg: "Order Success" });
+    } catch (err) {
+      return res.status(500).json({ msg: err.message });
     }
   },
 
-  getOrderById: async (req, res) => {
+  getOrders: async (req, res) => {
     try {
-      const order = await Order.findById(req.params.id);
-      if (order) {
-        res.json(order);
-      } else {
-        res.status(404).json({ message: "Order not found" });
-      }
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
-  },
-
-  getOrderAdmin: async (req, res) => {
-    try {
-      const orders = await Order.find({}).populate("user_id", "name");
-      console.log(orders);
+      const orders = await Order.find({ user_id: req.user.id });
       res.json(orders);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+    } catch (err) {
+      return res.status(500).json({ msg: err.message });
     }
   },
 
-  updateOrderToPaid: async (req, res) => {
+  getOrdersAdmin: async (req, res) => {
     try {
-      const order = await Order.findById(req.params.id);
-      if (order) {
-        order.isPaid = true;
-        order.paidAt = Date.now();
-        order.paymentResult = {
-          id: req.body.id,
-          status: req.body.status,
-          update_time: req.body.update_time,
-          email_address: req.body.payer.email_address,
-        };
+      const orders = await Order.find();
+      res.json(orders);
+    } catch (err) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
 
-        const updatedOrder = await order.save();
-        res.json(updatedOrder);
-      } else {
-        res.status(404).json({ message: "Order not found" });
-      }
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+  updateOrder: async (req, res) => {
+    try {
+      const { status } = req.body;
+      await Order.findByIdAndUpdate(req.params.id, { status });
+      res.json({ msg: "Updated a Order" });
+    } catch (err) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+
+  addOrderByVNPay: async (req, res) => {
+    try {
+      const { address, phone, name, payment, user_id, total } = req.body;
+      const cart = await Cart.findOne({ user_id }).populate("products.product");
+      const user = await User.findById(user_id);
+      if (!cart) return res.status(400).json({ msg: "Cart is empty" });
+      if (!user) return res.status(400).json({ msg: "User not found" });
+      const newOrder = new Order({
+        address,
+        phone,
+        name,
+        payment,
+        user_id,
+        total,
+      });
+      await newOrder.save();
+      cart.products.map(async (item) => {
+        const newDetailOrder = new DetailOrder({
+          order_id: newOrder._id,
+          product_id: item.product._id,
+          quantity: item.quantity,
+          price: item.product.price,
+        });
+        await newDetailOrder.save();
+        await Product.findByIdAndUpdate(item.product._id, {
+          $inc: { sold: item.quantity },
+        });
+      });
+      await Cart.findOneAndDelete({ user_id });
+      res.json({ msg: "Order Success" });
+    } catch (err) {
+      return res.status(500).json({ msg: err.message });
     }
   },
 };
+
+function sortObject(obj) {
+  let sorted = {};
+  let str = [];
+  let key;
+  for (key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      str.push(encodeURIComponent(key));
+    }
+  }
+  str.sort();
+  for (key = 0; key < str.length; key++) {
+    sorted[str[key]] = encodeURIComponent(obj[str[key]]).replace(/%20/g, "+");
+  }
+  return sorted;
+}
 
 module.exports = orderController;

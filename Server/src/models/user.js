@@ -1,6 +1,6 @@
 const Moogose = require("mongoose");
 
-const userSchema = Moogose.Schema(
+const User = Moogose.Schema(
   {
     name: {
       type: String,
@@ -41,4 +41,4 @@ const userSchema = Moogose.Schema(
   }
 );
 
-module.exports = Moogose.model("user", userSchema);
+module.exports = Moogose.model("user", User);

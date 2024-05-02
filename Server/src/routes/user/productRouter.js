@@ -11,4 +11,6 @@ router.get("/type/:category", productController.classification);
 // router.put("/:id", productController.updateProduct);
 // router.delete("/:id", productController.deleteProduct);
 
+//rating
+
 module.exports = router;
